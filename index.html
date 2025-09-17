@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Mini Doom Shooter</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: black; }
+    #hud { position: absolute; top: 10px; left: 10px; color: white; font-family: monospace; }
+  </style>
+</head>
+<body>
+<div id="hud">Ammo: <span id="ammo">6</span></div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/controls/PointerLockControls.js"></script>
+<script>
+let scene = new THREE.Scene();
+let camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+let renderer = new THREE.WebGLRenderer();
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+// Controls
+let controls = new THREE.PointerLockControls(camera, document.body);
+document.body.addEventListener('click', () => controls.lock());
+scene.add(controls.getObject());
+
+// Light
+let light = new THREE.DirectionalLight(0xffffff, 1);
+light.position.set(10,10,10);
+scene.add(light);
+
+// Floor
+let floor = new THREE.Mesh(
+  new THREE.PlaneGeometry(100,100),
+  new THREE.MeshPhongMaterial({color:0x222222})
+);
+floor.rotation.x = -Math.PI/2;
+scene.add(floor);
+
+// Player
+let velocity = new THREE.Vector3();
+let keys = {};
+document.addEventListener('keydown', e=>keys[e.code]=true);
+document.addEventListener('keyup', e=>keys[e.code]=false);
+
+// Ammo
+let ammo = 6;
+let ammoSpan = document.getElementById("ammo");
+
+// Enemies
+let enemies = [];
+function spawnEnemy() {
+  let geo = new THREE.BoxGeometry(1,1,1);
+  let mat = new THREE.MeshPhongMaterial({color:0xff0000});
+  let enemy = new THREE.Mesh(geo, mat);
+  enemy.position.set((Math.random()-0.5)*20,0.5,-20-Math.random()*30);
+  enemy.health = 30;
+  scene.add(enemy);
+  enemies.push(enemy);
+}
+setInterval(spawnEnemy, 3000);
+
+// Shooting
+document.addEventListener('mousedown', () => {
+  if(ammo > 0){
+    ammo--;
+    ammoSpan.textContent = ammo;
+    let ray = new THREE.Raycaster(camera.position, camera.getWorldDirection(new THREE.Vector3()));
+    let hits = ray.intersectObjects(enemies);
+    if(hits.length > 0){
+      let e = hits[0].object;
+      e.health -= 15;
+      if(e.health <= 0){
+        scene.remove(e);
+        enemies = enemies.filter(x=>x!==e);
+      }
+    }
+  } else {
+    // reload
+    setTimeout(()=>{ ammo=6; ammoSpan.textContent=ammo; },1000);
+  }
+});
+
+// Game loop
+function animate(){
+  requestAnimationFrame(animate);
+
+  // Movement
+  if(keys["KeyW"]) velocity.z = -0.1;
+  if(keys["KeyS"]) velocity.z = 0.1;
+  if(keys["KeyA"]) velocity.x = -0.1;
+  if(keys["KeyD"]) velocity.x = 0.1;
+  controls.moveRight(velocity.x);
+  controls.moveForward(velocity.z);
+  velocity.set(0,0,0);
+
+  // Enemies chase player
+  enemies.forEach(e=>{
+    let dir = new THREE.Vector3();
+    dir.subVectors(camera.position, e.position).normalize();
+    e.position.add(dir.multiplyScalar(0.02));
+  });
+
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>
